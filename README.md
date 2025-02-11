@@ -1,5 +1,13 @@
 # LatentZip
 
+                    ╔═══════════════════════════════════╗
+                    ║   01110100 01101111 01110000      ║ 
+                    ║   01101111 01101100 01101111      ║
+                    ║   01100111 01111001               ║
+                    ╚═══════════════════════════════════╝
+
+                    [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░] 78% compressed
+
 LatentZip is a utf8 lossless compression and decompression tool that leverages a large language models and arithmetic coding to achieve state-of-the-art compression ratios. 
 
 The project is implemented in Zig with hooks to llama.cpp

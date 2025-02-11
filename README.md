@@ -51,8 +51,8 @@ LatentZip provides a command-line interface with the following options:
 | `-h, --help`                      | Display help information and exit.                                                            | Yes      |
 | `-c, --compress <input_file>`       | Compress the specified input file.                                                           | No       |
 | `-d, --decompress <input_file>`     | Decompress the specified input file.                                                         | No       |
-| `-o, --output <output_file>`        | Specify the output file name (default: auto-generated).                                       | Yes      |
-| `-v, --verbose`                   | Enable verbose mode for epic real-time progress and debug logs.                               | Yes      |
+| `-o, --output <output_file>`        | Specify the output file name (default: stdout).                                       | Yes      |
+| `-v, --verbose`                   | Enable verbose mode for additional logs.                               | Yes      |
 | `-m, --hf_repo <model_repo>`        | Set the Hugging Face model repository. Default: `unsloth/Llama-3.2-3B-Instruct-GGUF`.           | Yes      |
 
 ### Examples

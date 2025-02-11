@@ -1,0 +1,6 @@
+[submodule "projects/compress/llama.cpp.zig"]
+	path = projects/compress/llama.cpp.zig
+	url = git@github.com:Deins/llama.cpp.zig.git
+[submodule "llama.cpp.zig"]
+	path = llama.cpp.zig
+	url = git@github.com:Deins/llama.cpp.zig.git

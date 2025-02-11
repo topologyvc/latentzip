@@ -21,10 +21,14 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .source_path = "llama.cpp.zig",
+        .backends = .{
+            .cpu = true,
+            .metal = target.result.isDarwin() and target.result.cpu.arch == .aarch64,
+        },
     });
 
     const exe = b.addExecutable(.{
-        .name = "compress",
+        .name = "latentzip",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,

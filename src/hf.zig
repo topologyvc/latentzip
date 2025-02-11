@@ -81,6 +81,5 @@ pub fn loadHfRepo(allocator: std.mem.Allocator, hf_repo: []const u8) ![]const u8
         return err;
     };
     defer file.close();
-    std.debug.print("Model found!\n", .{});
     return output_path;
 }

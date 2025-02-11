@@ -117,22 +117,14 @@ const LlamaCpp = struct {
     ctx: *llama.Context,
 
     pub fn init(allocator: Allocator, hf_repo: []const u8) !*LlamaCpp {
-        std.debug.print("Initializing LlamaCpp\n", .{});
-        std.debug.print("Creating LlamaCpp struct\n", .{});
         const self = try allocator.create(LlamaCpp);
-        std.debug.print("Loading HuggingFace repo from {s}\n", .{hf_repo});
         const path = try hf.loadHfRepo(allocator, hf_repo);
-        std.debug.print("Converting path to null-terminated string\n", .{});
         const c_path: [:0]const u8 = try std.mem.Allocator.dupeZ(allocator, u8, path);
         defer allocator.free(path);
         defer allocator.free(c_path);
-        std.debug.print("Initializing llama backend\n", .{});
         llama.Backend.init();
-        std.debug.print("Loading model from {s}\n", .{c_path});
         self.model = try llama.Model.initFromFile(c_path.ptr, llama.Model.defaultParams());
-        std.debug.print("Creating sampler chain\n", .{});
         var sampler = llama.Sampler.initChain(.{ .no_perf = false });
-        std.debug.print("Adding greedy sampler\n", .{});
         sampler.add(llama.Sampler.initGreedy());
         self.sampler = sampler;
         var cparams = llama.Context.defaultParams();
@@ -141,7 +133,6 @@ const LlamaCpp = struct {
         cparams.n_threads_batch = @intCast(cpu_threads / 2);
         cparams.no_perf = false;
         self.ctx = try llama.Context.initWithModel(self.model, cparams);
-        std.debug.print("LlamaCpp initialized successfully\n", .{});
         return self;
     }
 

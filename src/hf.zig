@@ -1,5 +1,6 @@
 const std = @import("std");
 const llama = @import("llama");
+const builtin = @import("builtin");
 
 const GgufFile = struct {
     rfilename: []const u8,
@@ -9,12 +10,29 @@ const Manifest = struct {
     ggufFile: GgufFile,
 };
 
+fn getCacheDir(allocator: std.mem.Allocator) ![]const u8 {
+    const cache_dir = if (builtin.os.tag == .macos) blk: {
+        const home = try std.process.getEnvVarOwned(allocator, "HOME");
+        defer allocator.free(home);
+        break :blk try std.fs.path.join(allocator, &.{ home, "Library", "Caches", "llama.cpp" });
+    } else if (builtin.os.tag == .linux) blk: {
+        const home = try std.process.getEnvVarOwned(allocator, "HOME");
+        defer allocator.free(home);
+        break :blk try std.fs.path.join(allocator, &.{ home, ".cache", "llama.cpp" });
+    } else {
+        return error.UnsupportedPlatform;
+    };
+    return cache_dir;
+}
+
 pub fn getHfFilePath(allocator: std.mem.Allocator, hf_repo: []const u8) ![]const u8 {
     const hf_repo_prefix = try allocator.dupe(u8, hf_repo);
     defer allocator.free(hf_repo_prefix);
     std.mem.replaceScalar(u8, hf_repo_prefix, '/', '_');
     const manifest = try getHfManifest(allocator, hf_repo);
-    return try std.fmt.allocPrint(allocator, "/Users/xyz/Library/Caches/llama.cpp/{s}_{s}", .{ hf_repo_prefix, manifest.ggufFile.rfilename });
+    const cache_dir = try getCacheDir(allocator);
+    defer allocator.free(cache_dir);
+    return try std.fmt.allocPrint(allocator, "{s}/{s}_{s}", .{ cache_dir, hf_repo_prefix, manifest.ggufFile.rfilename });
 }
 
 fn getHfManifest(allocator: std.mem.Allocator, hf_repo: []const u8) !Manifest {

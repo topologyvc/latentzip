@@ -1,5 +1,10 @@
 # LatentZip
 
+[![CI](https://github.com/topologyvc/latentzip/actions/workflows/ci.yml/badge.svg)](https://github.com/topologyvc/latentzip/actions/workflows/ci.yml)
+[![Metal Backend](https://github.com/topologyvc/latentzip/actions/workflows/metal-test.yml/badge.svg)](https://github.com/topologyvc/latentzip/actions/workflows/metal-test.yml)
+[![Release](https://img.shields.io/github/v/release/topologyvc/latentzip)](https://github.com/topolovy/latentzip/releases)
+[![License](https://img.shields.io/github/license/topologyvc/latentzip)](https://github.com/topologyvc/latentzip/blob/main/LICENSE)
+
                     ╔═══════════════════════════════════╗
                     ║   01110100 01101111 01110000      ║
                     ║   01101111 01101100 01101111      ║
@@ -28,7 +33,7 @@ LatentZip is a **UTF-8 lossless compression and decompression tool** that fuses 
 2. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/latentzip.git
+   git clone https://github.com/topologyvc/latentzip.git
    cd latentzip
    ```
 

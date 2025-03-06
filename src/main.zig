@@ -1,3 +1,5 @@
+/// Command-line interface for the LatentZip compression tool
+/// Provides compression and decompression functionality with various options
 const std = @import("std");
 const clap = @import("clap");
 const llm = @import("llm.zig");
@@ -7,8 +9,13 @@ const zip = @import("zip.zig");
 const Allocator = std.mem.Allocator;
 const stdout = std.io.getStdOut().writer();
 
-// ---------------------------------------------------------------------
-// Main entry: argument parsing and compression/decompression modes.
+/// Main entry point for the LatentZip CLI application
+///
+/// Handles command-line argument parsing and dispatches to appropriate
+/// compression or decompression functionality. Supports various options
+/// including verbose mode and custom model selection.
+///
+/// Error: Returns an error if file operations or compression/decompression fails
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
     const args = try std.process.argsAlloc(allocator);
@@ -34,6 +41,7 @@ pub fn main() !void {
     };
     defer res.deinit();
 
+    // Default to a small but capable model if none specified
     var model: []const u8 = "unsloth/Llama-3.2-3B-Instruct-GGUF";
     if (res.args.hf_repo) |repo| {
         model = repo;

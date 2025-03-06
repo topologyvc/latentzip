@@ -1,9 +1,13 @@
+/// Language model integration for token probability prediction
+/// Provides interfaces to work with language models for compression
 const std = @import("std");
 const llama = @import("llama");
 const hf = @import("hf.zig");
 
 const Allocator = std.mem.Allocator;
 
+/// Inner structure for token probability representation in LLama.cpp
+/// Contains detailed information about a single token prediction
 const LlamaCompletionProbabilityInner = struct {
     id: u32,
     token: []const u8,
@@ -11,6 +15,8 @@ const LlamaCompletionProbabilityInner = struct {
     logprob: f32,
 };
 
+/// Completion probability structure for LLama.cpp model responses
+/// Includes the token, its log probability, and related top predictions
 const LlamaCompletionProbability = struct {
     id: u32,
     token: []const u8,
@@ -19,30 +25,44 @@ const LlamaCompletionProbability = struct {
     top_logprobs: []LlamaCompletionProbabilityInner,
 };
 
+/// Container for LLama.cpp completion probabilities
 const LlamaData = struct {
     completion_probabilities: []LlamaCompletionProbability,
 };
 
+/// Intermediate representation of logit values during token probability calculation
 const IntermediateLogit = struct {
     logit: f32,
     token_idx: llama.Token,
 };
 
+/// Token representation with cumulative distribution function probability
+/// Used for arithmetic coding in compression/decompression
 pub const CdfToken = struct {
     token: []const u8,
     probability: u64,
 };
 
+/// Collection of CDF tokens with memory management capabilities
+/// Provides ownership and cleanup of token arrays
 pub const CdfTokens = struct {
     tokens: []CdfToken,
     allocator: Allocator,
 
+    /// Initialize a new CdfTokens collection
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for tokens management
+    ///   tokens: Array of CdfToken structures
+    ///
+    /// Returns: Pointer to initialized CdfTokens structure
     pub fn init(allocator: Allocator, tokens: []CdfToken) !*CdfTokens {
         const self = try allocator.create(CdfTokens);
         self.* = .{ .tokens = tokens, .allocator = allocator };
         return self;
     }
 
+    /// Clean up all allocated memory for tokens
     pub fn deinit(self: *@This()) void {
         for (self.tokens) |token| {
             self.allocator.free(token.token);
@@ -52,7 +72,15 @@ pub const CdfTokens = struct {
     }
 };
 
+/// Server interface for LLama.cpp model interactions
 const LlamaCppServer = struct {
+    /// Call the LLama.cpp server for completion probability predictions
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for response handling
+    ///   prompt: Input prompt for completion probability prediction
+    ///
+    /// Returns: Pointer to LlamaData structure containing completion probabilities
     fn callLlamaCpp(allocator: Allocator, prompt: []const u8) !LlamaData {
         const data = .{
             .prompt = prompt,
@@ -80,6 +108,13 @@ const LlamaCppServer = struct {
         return llama_data.value;
     }
 
+    /// Convert log probabilities to cumulative distribution function (CDF) values
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for CDF calculation
+    ///   llama_data: Pointer to LlamaData structure containing completion probabilities
+    ///
+    /// Returns: Array of CDF values
     fn logprobToCdf(allocator: Allocator, llama_data: *const LlamaData) ![]u64 {
         const scale: u64 = 1000;
         var cdf = std.ArrayList(u64).init(allocator);
@@ -95,6 +130,13 @@ const LlamaCppServer = struct {
         return cdf.items;
     }
 
+    /// Get the CDF tokens for a given prompt using the LLama.cpp server
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for response handling
+    ///   prompt: Input prompt for completion probability prediction
+    ///
+    /// Returns: Pointer to CdfTokens structure containing CDF tokens
     pub fn getLlmCdf(allocator: Allocator, prompt: []const u8) !*CdfTokens {
         const llama_data = try LlamaCppServer.callLlamaCpp(allocator, prompt);
         const cdf = try LlamaCppServer.logprobToCdf(allocator, &llama_data);
@@ -106,16 +148,25 @@ const LlamaCppServer = struct {
     }
 };
 
+/// Comparison function for sorting IntermediateLogit structures
 fn compare_logits(_: void, a: IntermediateLogit, b: IntermediateLogit) bool {
     return a.logit > b.logit;
 }
 
+/// LLama.cpp model interface for token probability prediction
 const LlamaCpp = struct {
     model: *llama.Model,
     sampler: *llama.Sampler,
     vocab: *llama.Vocab,
     ctx: *llama.Context,
 
+    /// Initialize the LLama.cpp model
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for model initialization
+    ///   hf_repo: Path to the Hugging Face repository for model loading
+    ///
+    /// Returns: Pointer to initialized LlamaCpp structure
     pub fn init(allocator: Allocator, hf_repo: []const u8) !*LlamaCpp {
         const self = try allocator.create(LlamaCpp);
         const path = try hf.loadHfRepo(allocator, hf_repo);
@@ -136,6 +187,7 @@ const LlamaCpp = struct {
         return self;
     }
 
+    /// Clean up the LLama.cpp model
     pub fn deinit(self: *LlamaCpp) void {
         llama.Backend.deinit();
         self.model.?.deinit();
@@ -143,6 +195,13 @@ const LlamaCpp = struct {
         self.ctx.?.deinit();
     }
 
+    /// Get the CDF tokens for a given prompt using the LLama.cpp model
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for response handling
+    ///   prompt: Input prompt for completion probability prediction
+    ///
+    /// Returns: Pointer to CdfTokens structure containing CDF tokens
     pub fn getLlmCdf(self: *LlamaCpp, allocator: Allocator, prompt: []const u8) !*CdfTokens {
         if (prompt.len == 0) {
             return self.zeroPrompt(allocator);
@@ -182,6 +241,7 @@ const LlamaCpp = struct {
         return try CdfTokens.init(allocator, entries);
     }
 
+    /// Handle zero-length prompts by returning a default CDF token set
     fn zeroPrompt(_: *LlamaCpp, allocator: Allocator) !*CdfTokens {
         const entries = try allocator.alloc(CdfToken, 256);
         var i: u8 = 1;
@@ -196,6 +256,7 @@ const LlamaCpp = struct {
     }
 };
 
+/// Configuration structure for interface initialization
 pub const InterfaceConfig = struct {
     hf_repo: []const u8,
     inference_mode: enum {
@@ -204,10 +265,18 @@ pub const InterfaceConfig = struct {
     },
 };
 
+/// Interface for language model interactions
 pub const Interface = struct {
     config: InterfaceConfig,
     llama_cpp: ?*LlamaCpp,
 
+    /// Initialize the interface
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for interface initialization
+    ///   config: Interface configuration structure
+    ///
+    /// Returns: Pointer to initialized Interface structure
     pub fn init(allocator: Allocator, config: InterfaceConfig) !*Interface {
         const self = try allocator.create(Interface);
         self.* = .{ .config = config, .llama_cpp = null };
@@ -217,12 +286,20 @@ pub const Interface = struct {
         return self;
     }
 
+    /// Clean up the interface
     pub fn deinit(self: *Interface) void {
         if (self.config.inference_mode == .llama_cpp) {
             self.llama_cpp.?.deinit();
         }
     }
 
+    /// Get the CDF tokens for a given prompt using the interface
+    ///
+    /// Params:
+    ///   allocator: Memory allocator for response handling
+    ///   prompt: Input prompt for completion probability prediction
+    ///
+    /// Returns: Pointer to CdfTokens structure containing CDF tokens
     pub fn getLlmCdf(self: *Interface, allocator: Allocator, prompt: []const u8) !*CdfTokens {
         switch (self.config.inference_mode) {
             .llama_cpp_server => return LlamaCppServer.getLlmCdf(allocator, prompt),

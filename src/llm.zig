@@ -159,6 +159,7 @@ const LlamaCpp = struct {
     sampler: *llama.Sampler,
     vocab: *llama.Vocab,
     ctx: *llama.Context,
+    batch: *llama.Batch,
 
     /// Initialize the LLama.cpp model
     ///
@@ -184,6 +185,8 @@ const LlamaCpp = struct {
         cparams.n_threads_batch = @intCast(cpu_threads / 2);
         cparams.no_perf = false;
         self.ctx = try llama.Context.initWithModel(self.model, cparams);
+        self.batch = try allocator.create(llama.Batch);
+        self.batch.* = llama.Batch.init(@intCast(self.ctx.nBatch()), 0, 1);
         return self;
     }
 
@@ -193,6 +196,7 @@ const LlamaCpp = struct {
         self.model.?.deinit();
         self.sampler.?.deinit();
         self.ctx.?.deinit();
+        self.batch.?.deinit();
     }
 
     /// Get the CDF tokens for a given prompt using the LLama.cpp model
@@ -206,16 +210,23 @@ const LlamaCpp = struct {
         if (prompt.len == 0) {
             return self.zeroPrompt(allocator);
         }
+        self.batch.clear();
         const vocab = self.model.vocab() orelse unreachable;
         var tokenizer = llama.Tokenizer.init(allocator);
         defer tokenizer.deinit();
         try tokenizer.tokenize(vocab, prompt, false, true);
         var detokenizer = llama.Detokenizer.init(allocator);
         defer detokenizer.deinit();
-        const start = if (tokenizer.getTokens().len > self.ctx.nBatch()) tokenizer.getTokens().len - self.ctx.nBatch() else 0;
-        const batch_tokens = tokenizer.getTokens()[start..];
-        const batch = llama.Batch.initOne(batch_tokens);
-        try batch.decode(self.ctx);
+        const start_index = tokenizer.getTokens().len - 1;
+        const batch_tokens = tokenizer.getTokens()[start_index..];
+        self.batch.add(batch_tokens[0], @intCast(start_index), &[_]llama.SeqId{0}, true);
+        self.batch.decode(self.ctx) catch |err| {
+            if (err == error.NoKvSlotWarning) {
+                self.ctx.kvCacheClear();
+            } else {
+                return err;
+            }
+        };
         const logits = self.ctx.getLogitsIth(@intCast(batch_tokens.len - 1));
         const n_vocab: usize = @intCast(vocab.nVocab());
         const intermediate_entries = try allocator.alloc(IntermediateLogit, n_vocab);
@@ -237,7 +248,6 @@ const LlamaCpp = struct {
             entries[i] = .{ .token = token_str_copy, .probability = running_prob };
             detokenizer.clearRetainingCapacity();
         }
-        self.ctx.kvCacheClear();
         return try CdfTokens.init(allocator, entries);
     }
 

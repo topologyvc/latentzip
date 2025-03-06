@@ -1,5 +1,9 @@
 # LatentZip
 
+[![CI](https://github.com/topologyvc/latentzip/actions/workflows/ci.yml/badge.svg)](https://github.com/topologyvc/latentzip/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/topologyvc/latentzip)](https://github.com/topologyvc/latentzip/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/topologyvc/latentzip/blob/main/LICENSE)
+
                     ╔═══════════════════════════════════╗
                     ║   01110100 01101111 01110000      ║
                     ║   01101111 01101100 01101111      ║
@@ -75,4 +79,4 @@ Contributions to this project are welcome - please feel free to submit a pull re
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE) - see the [LICENSE](LICENSE) file for details.

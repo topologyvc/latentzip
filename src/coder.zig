@@ -1,13 +1,15 @@
+/// Arithmetic coding implementation for efficient data compression
+/// This module provides the core arithmetic coding algorithms used by LatentZip
 const std = @import("std");
 const llm = @import("llm.zig");
 const Allocator = std.mem.Allocator;
 
-// ---------------------------------------------------------------------
-// Constants
+/// Number of bits used for internal state representation
+/// Larger values provide more precision but require more memory
 const NUM_STATE_BITS: u8 = 52;
 
-// ---------------------------------------------------------------------
-// Base arithmetic coder functionality
+/// Base implementation of arithmetic coding functionality
+/// Shared between encoder and decoder implementations
 const ArithmeticCoderBase = struct {
     half_range: u64,
     quarter_range: u64,
@@ -15,6 +17,9 @@ const ArithmeticCoderBase = struct {
     low: u64,
     high: u64,
 
+    /// Initialize a new arithmetic coder base with default state values
+    ///
+    /// Returns: Configured ArithmeticCoderBase instance
     pub fn init() ArithmeticCoderBase {
         const half_range: u64 = 1 << (NUM_STATE_BITS - 1);
         return .{
@@ -26,6 +31,14 @@ const ArithmeticCoderBase = struct {
         };
     }
 
+    /// Update the arithmetic coder's state based on a symbol and its probability
+    ///
+    /// Params:
+    ///   Handler: Type of the handler (either Encoder or Decoder)
+    ///   handler: Instance of the handler for bit operations
+    ///   base: Arithmetic coder base instance to update
+    ///   cdf: Cumulative distribution function representing token probabilities
+    ///   symbol: Index of the symbol being encoded/decoded
     pub fn update(comptime Handler: type, handler: *Handler, base: *ArithmeticCoderBase, cdf: []const llm.CdfToken, symbol: usize) void {
         const total: u128 = cdf[cdf.len - 1].probability;
         const range: u128 = base.high - base.low + 1;
@@ -46,8 +59,8 @@ const ArithmeticCoderBase = struct {
     }
 };
 
-// ---------------------------------------------------------------------
-// Encoder implementation
+/// Encoder implementation for arithmetic coding
+/// Handles the compression of symbols based on their probability distributions
 pub const Encoder = struct {
     base: ArithmeticCoderBase,
     encoded_data: std.ArrayList(u8),
@@ -55,6 +68,9 @@ pub const Encoder = struct {
     num_underflow: usize,
     allocator: Allocator,
 
+    /// Initialize a new encoder instance with the given allocator
+    ///
+    /// Returns: Configured Encoder instance
     pub fn init(allocator: Allocator) !Encoder {
         return .{
             .base = ArithmeticCoderBase.init(),
@@ -65,22 +81,31 @@ pub const Encoder = struct {
         };
     }
 
+    /// Deinitialize the encoder instance
     pub fn deinit(self: *Encoder) void {
         self.encoded_data.deinit();
     }
 
+    /// Encode a symbol based on its probability distribution
+    ///
+    /// Params:
+    ///   cdf: Cumulative distribution function representing token probabilities
+    ///   symbol: Index of the symbol being encoded
     pub fn encodeSymbol(self: *Encoder, cdf: []const llm.CdfToken, symbol: usize) void {
         ArithmeticCoderBase.update(Encoder, self, &self.base, cdf, symbol);
     }
 
+    /// Finish encoding and finalize the compressed data
     pub fn finish(self: *Encoder) !void {
         try self.appendBit(1);
     }
 
+    /// Get the encoded data as a byte slice
     pub fn getEncoded(self: *const Encoder) []const u8 {
         return self.encoded_data.items;
     }
 
+    /// Shift the encoder's state by one bit
     fn shift(self: *Encoder) void {
         const bit: u1 = @intCast(self.base.low >> (NUM_STATE_BITS - 1));
         self.appendBit(bit) catch unreachable;
@@ -91,10 +116,15 @@ pub const Encoder = struct {
         self.num_underflow = 0;
     }
 
+    /// Handle an underflow event in the encoder's state
     fn underflow(self: *Encoder) void {
         self.num_underflow += 1;
     }
 
+    /// Append a bit to the encoded data
+    ///
+    /// Params:
+    ///   bit: Bit value to append (0 or 1)
     fn appendBit(self: *Encoder, bit: u1) !void {
         if (self.bit_index == 0) {
             try self.encoded_data.append(0);
@@ -104,8 +134,8 @@ pub const Encoder = struct {
     }
 };
 
-// ---------------------------------------------------------------------
-// Decoder implementation
+/// Decoder implementation for arithmetic coding
+/// Handles the decompression of encoded data using probability distributions
 pub const Decoder = struct {
     base: ArithmeticCoderBase,
     input: []const u8,
@@ -113,6 +143,9 @@ pub const Decoder = struct {
     bit_index: u3,
     code: u64,
 
+    /// Initialize a new decoder instance with the given input data
+    ///
+    /// Returns: Configured Decoder instance
     pub fn init(input: []const u8) !Decoder {
         var decoder = Decoder{
             .base = ArithmeticCoderBase.init(),
@@ -129,6 +162,12 @@ pub const Decoder = struct {
         return decoder;
     }
 
+    /// Decode a symbol based on its probability distribution
+    ///
+    /// Params:
+    ///   cdf: Cumulative distribution function representing token probabilities
+    ///
+    /// Returns: Index of the decoded symbol
     pub fn decodeSymbol(self: *Decoder, cdf: []const llm.CdfToken) usize {
         const total: u128 = cdf[cdf.len - 1].probability;
         const range: u128 = self.base.high - self.base.low + 1;
@@ -142,16 +181,19 @@ pub const Decoder = struct {
         return symbol;
     }
 
+    /// Shift the decoder's state by one bit
     fn shift(self: *Decoder) void {
         self.code = ((self.code << 1) & self.base.state_mask) | self.readCodeBit();
     }
 
+    /// Handle an underflow event in the decoder's state
     fn underflow(self: *Decoder) void {
         self.code = (self.code & self.base.half_range) |
             ((self.code << 1) & (self.base.state_mask >> 1)) |
             self.readCodeBit();
     }
 
+    /// Read a bit from the input data
     fn readCodeBit(self: *Decoder) u1 {
         if (self.byte_index >= self.input.len) {
             return 0;
